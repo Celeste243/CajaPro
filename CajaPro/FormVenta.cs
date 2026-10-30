@@ -1,25 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using MySql.Data.MySqlClient;
 using System.Linq;
 using System.Windows.Forms;
-using CajaPro.Logica;
+using CajaPro.Datos;
 using CajaPro.Modelos;
 
 namespace CajaPro
 {
     public partial class FormVenta : Form
     {
-        // Carrito de compras temporal para la sesión actual de la caja
+        // Carrito temporal de la venta en curso (IdProducto guarda el CÓDIGO de barras)
         private List<DetalleVenta> carritoActual = new List<DetalleVenta>();
         public static bool ModoIncognitoActivo = false;
+
         public FormVenta()
         {
             InitializeComponent();
         }
 
         // ==========================================
-        // CARGA INICIAL: Llena el combo con los clientes
+        // CARGA INICIAL
         // ==========================================
         private void FormVenta_Load(object sender, EventArgs e)
         {
@@ -29,11 +31,29 @@ namespace CajaPro
 
         private void CargarClientes()
         {
-            cbClientes.DataSource = null;
-            // Trae los clientes activos del motor de CajaPro
-            cbClientes.DataSource = SupermercadoEngine.Clientes.Where(c => c.Activo).ToList();
-            cbClientes.DisplayMember = "Nombre";
-            cbClientes.ValueMember = "Id";
+            DataTable tabla = new DataTable();
+            Conexion cn = new Conexion();
+            try
+            {
+                // Consumidor Final primero, después el resto por nombre
+                MySqlCommand cmd = new MySqlCommand(
+                    "SELECT IdCliente, RTRIM(Nombre) AS Nombre FROM Clientes WHERE Estado = 1 " +
+                    "ORDER BY CASE WHEN DNI = '00000000' THEN 0 ELSE 1 END, Nombre",
+                    cn.AbrirConexion());
+
+                using (MySqlDataReader lector = cmd.ExecuteReader())
+                {
+                    tabla.Load(lector);
+                }
+            }
+            finally
+            {
+                cn.CerrarConexion();
+            }
+
+            cmbCliente.DisplayMember = "Nombre";
+            cmbCliente.ValueMember = "IdCliente";
+            cmbCliente.DataSource = tabla;
         }
 
         // ==========================================
@@ -43,7 +63,7 @@ namespace CajaPro
         {
             try
             {
-                string codigo = txtCodigoProd.Text.Trim();
+                string codigo = txtCodigoProducto.Text.Trim();
 
                 if (string.IsNullOrEmpty(codigo))
                 {
@@ -51,55 +71,78 @@ namespace CajaPro
                     return;
                 }
 
-                if (!int.TryParse(txtCantidad.Text, out int cantidad) || cantidad <= 0)
+                int cantidad = (int)numericUpDown1.Value;
+                if (cantidad <= 0)
                 {
                     MessageBox.Show("Ingrese una cantidad válida mayor a cero.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                // Buscamos el producto en las góndolas virtuales
-                var prod = SupermercadoEngine.Productos.FirstOrDefault(p => p.Id == codigo && p.Activo);
+                // Buscar el producto en la base
+                bool encontrado = false;
+                string nombre = "";
+                decimal precio = 0;
+                int stock = 0;
 
-                if (prod == null)
+                Conexion cn = new Conexion();
+                try
+                {
+                    MySqlCommand cmd = new MySqlCommand(
+                        "SELECT RTRIM(Nombre) AS Nombre, Precio, Stock FROM Productos WHERE Codigo = @Codigo AND Estado = 1",
+                        cn.AbrirConexion());
+                    cmd.Parameters.AddWithValue("@Codigo", codigo);
+
+                    using (MySqlDataReader lector = cmd.ExecuteReader())
+                    {
+                        if (lector.Read())
+                        {
+                            encontrado = true;
+                            nombre = lector["Nombre"].ToString();
+                            precio = (decimal)lector["Precio"];
+                            stock = (int)lector["Stock"];
+                        }
+                    }
+                }
+                finally
+                {
+                    cn.CerrarConexion();
+                }
+
+                if (!encontrado)
                 {
                     MessageBox.Show("El código ingresado no corresponde a un producto activo.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
-                // Verificamos si hay stock suficiente antes de sumarlo visualmente
-                if (prod.Stock < cantidad)
+                // ¿Cuántas unidades de este producto ya hay en el carrito?
+                var itemYaEnCarrito = carritoActual.FirstOrDefault(i => i.IdProducto == codigo);
+                int yaEnCarrito = itemYaEnCarrito != null ? itemYaEnCarrito.Cantidad : 0;
+
+                if (stock < yaEnCarrito + cantidad)
                 {
-                    MessageBox.Show($"Stock insuficiente. Quedan solo {prod.Stock} unidades en góndola.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show($"Stock insuficiente. Quedan {stock} unidades y ya tenés {yaEnCarrito} en el carrito.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                // Si el producto ya estaba en el carrito, sumamos la cantidad
-                var itemYaEnCarrito = carritoActual.FirstOrDefault(i => i.IdProducto == codigo);
                 if (itemYaEnCarrito != null)
                 {
-                    if (prod.Stock < (itemYaEnCarrito.Cantidad + cantidad))
-                    {
-                        MessageBox.Show("No se puede agregar esa cantidad. Supera el stock disponible.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
                     itemYaEnCarrito.Cantidad += cantidad;
                 }
                 else
                 {
-                    // Si es nuevo, lo agregamos al carrito temporal
                     carritoActual.Add(new DetalleVenta
                     {
-                        IdProducto = prod.Id,
-                        NombreProducto = prod.Nombre,
-                        PrecioUnitario = prod.Precio,
+                        IdProducto = codigo,
+                        NombreProducto = nombre,
+                        PrecioUnitario = precio,
                         Cantidad = cantidad
                     });
                 }
 
                 ActualizarGrillaYTotal();
-                txtCodigoProd.Clear();
-                txtCantidad.Text = "1";
-                txtCodigoProd.Focus();
+                txtCodigoProducto.Clear();
+                numericUpDown1.Value = 1;
+                txtCodigoProducto.Focus();
             }
             catch (Exception ex)
             {
@@ -108,39 +151,88 @@ namespace CajaPro
         }
 
         // ==========================================
-        // BOTÓN: COBRAR Y REGISTRAR LA FACTURA
+        // BOTÓN: COBRAR Y REGISTRAR LA VENTA
         // ==========================================
         private void btnCobrar_Click(object sender, EventArgs e)
         {
+            if (carritoActual.Count == 0)
+            {
+                MessageBox.Show("El carrito está vacío. Cargue productos antes de cobrar.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (cmbCliente.SelectedValue == null)
+            {
+                MessageBox.Show("Seleccione un cliente válido para la facturación.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            int idCliente = Convert.ToInt32(cmbCliente.SelectedValue);
+            decimal total = carritoActual.Sum(i => i.Subtotal);
+
+            Conexion cn = new Conexion();
+            MySqlTransaction tran = null;
             try
             {
-                if (carritoActual.Count == 0)
+                MySqlConnection con = cn.AbrirConexion();
+                tran = con.BeginTransaction();
+
+                // 1) Descontar el stock (solo si todavía alcanza)
+                foreach (var item in carritoActual)
                 {
-                    MessageBox.Show("El carrito está vacío. Cargue productos antes de cobrar.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
+                    MySqlCommand cmdStock = new MySqlCommand(
+                        "UPDATE Productos SET Stock = Stock - @Cant " +
+                        "WHERE Codigo = @Codigo AND Estado = 1 AND Stock >= @Cant",
+                        con, tran);
+                    cmdStock.Parameters.AddWithValue("@Cant", item.Cantidad);
+                    cmdStock.Parameters.AddWithValue("@Codigo", item.IdProducto);
+
+                    if (cmdStock.ExecuteNonQuery() == 0)
+                        throw new Exception($"No hay stock suficiente de {item.NombreProducto}.");
                 }
 
-                if (cbClientes.SelectedValue == null)
+                // 2) Guardar la venta y obtener su número
+                MySqlCommand cmdVenta = new MySqlCommand(
+                    "INSERT INTO Ventas (Fecha, IdCliente, Total) " +
+                    "OUTPUT INSERTED.IdVenta VALUES (GETDATE(), @IdCliente, @Total)",
+                    con, tran);
+                cmdVenta.Parameters.AddWithValue("@IdCliente", idCliente);
+                cmdVenta.Parameters.AddWithValue("@Total", total);
+                int idVenta = (int)cmdVenta.ExecuteScalar();
+
+                // 3) Guardar cada renglón del ticket
+                foreach (var item in carritoActual)
                 {
-                    MessageBox.Show("Seleccione un cliente válido para la facturación.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
+                    MySqlCommand cmdDetalle = new MySqlCommand(
+                        "INSERT INTO DetalleVenta (IdVenta, IdProductos, Cantidad, PrecioUnitario) " +
+                        "SELECT @IdVenta, IdProductos, @Cant, @Precio FROM Productos WHERE Codigo = @Codigo",
+                        con, tran);
+                    cmdDetalle.Parameters.AddWithValue("@IdVenta", idVenta);
+                    cmdDetalle.Parameters.AddWithValue("@Cant", item.Cantidad);
+                    cmdDetalle.Parameters.AddWithValue("@Precio", item.PrecioUnitario);
+                    cmdDetalle.Parameters.AddWithValue("@Codigo", item.IdProducto);
+                    cmdDetalle.ExecuteNonQuery();
                 }
 
-                string idCliente = cbClientes.SelectedValue.ToString();
+                // Todo salió bien: confirmar
+                tran.Commit();
 
-                // Enviamos el carrito al motor lógico para procesar la transacción y descontar stock
-                SupermercadoEngine.RegistrarVenta(idCliente, carritoActual);
+                MessageBox.Show($"¡Venta procesada con éxito!\nTicket N° {idVenta}  -  Total: ${total:F2}",
+                    "CajaPro - Facturación", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                MessageBox.Show("¡Venta procesada con éxito!\nTicket grabado en el historial de CajaPro.", "CajaPro - Facturación", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                // Limpiamos todo para la siguiente venta
                 carritoActual.Clear();
                 ActualizarGrillaYTotal();
                 LimpiarPantallaVenta();
             }
             catch (Exception ex)
             {
+                // Algo falló: deshacer todo para que no quede nada a medias
+                if (tran != null) tran.Rollback();
                 MessageBox.Show($"Error al procesar el cobro: {ex.Message}", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                cn.CerrarConexion();
             }
         }
 
@@ -165,21 +257,33 @@ namespace CajaPro
             }
         }
 
-
         private void LimpiarPantallaVenta()
         {
-            txtCodigoProd.Clear();
-            txtCantidad.Text = "1";
-            if (cbClientes.Items.Count > 0) cbClientes.SelectedIndex = 0;
+            txtCodigoProducto.Clear();
+            numericUpDown1.Value = 1;
+            if (cmbCliente.Items.Count > 0) cmbCliente.SelectedIndex = 0;
             lblTotal.Text = "TOTAL: $0.00";
         }
 
+        // ========================================================
+        // MÉTODOS QUE USA EL DISEÑADOR (se mantienen aunque estén vacíos)
+        // ========================================================
         private void FormVenta_Load_1(object sender, EventArgs e)
         {
             FormVenta_Load(sender, e);
         }
 
         private void txtCodigoProducto_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void lblFormaPago_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void groupBox2_Enter(object sender, EventArgs e)
         {
 
         }

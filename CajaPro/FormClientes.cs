@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Data;
-using System.Linq;
+using MySql.Data.MySqlClient;
 using System.Windows.Forms;
-using CajaPro.Logica;
-using CajaPro.Modelos;
+using CajaPro.Datos;
+
 namespace CajaPro
 {
     public partial class FormClientes : Form
     {
+        // DNI reservado para el cliente "Consumidor Final"
+        private const string DniConsumidorFinal = "00000000";
+
         public FormClientes()
         {
             InitializeComponent();
@@ -15,108 +18,175 @@ namespace CajaPro
 
         private void FormClientes_Load(object sender, EventArgs e)
         {
+            txtIDCliente.ReadOnly = true; // el ID lo numera la base
             RefrescarTabla();
         }
 
         private void RefrescarTabla()
         {
             dgvClientes.Rows.Clear();
-            foreach (var cli in SupermercadoEngine.Clientes)
+            Conexion cn = new Conexion();
+            try
             {
-                string estado = cli.Activo ? "Activo" : "Suspendido (Baja Lógica)";
-                dgvClientes.Rows.Add(cli.Id, cli.Nombre, cli.Dni, estado);
+                MySqlCommand cmd = new MySqlCommand(
+                    "SELECT IdCliente, Nombre, DNI, Estado FROM Clientes ORDER BY Nombre",
+                    cn.AbrirConexion());
+
+                using (MySqlDataReader lector = cmd.ExecuteReader())
+                {
+                    while (lector.Read())
+                    {
+                        string estado = (bool)lector["Estado"] ? "Activo" : "Suspendido (Baja Lógica)";
+                        dgvClientes.Rows.Add(
+                            lector["IdCliente"],
+                            lector["Nombre"].ToString().Trim(),
+                            lector["DNI"],
+                            estado);
+                    }
+                }
+            }
+            finally
+            {
+                cn.CerrarConexion();
             }
         }
 
+        // ¿Este cliente es el Consumidor Final?
+        private bool EsConsumidorFinal(MySqlConnection con, int idCliente)
+        {
+            MySqlCommand cmd = new MySqlCommand(
+                "SELECT COUNT(*) FROM Clientes WHERE IdCliente = @Id AND DNI = @Dni", con);
+            cmd.Parameters.AddWithValue("@Id", idCliente);
+            cmd.Parameters.AddWithValue("@Dni", DniConsumidorFinal);
+            return (int)cmd.ExecuteScalar() > 0;
+        }
+
+        // ==========================================
+        // ALTA / MODIFICACIÓN DE CLIENTE
+        // ==========================================
         private void btnGuardar_Click(object sender, EventArgs e)
         {
+            string nombre = txtNombre.Text.Trim();
+            string dni = txtDNI.Text.Trim();
+
+            if (nombre == "" || dni == "")
+            {
+                MessageBox.Show("El nombre y el DNI son obligatorios.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (dni == DniConsumidorFinal)
+            {
+                MessageBox.Show("El DNI 00000000 está reservado para Consumidor Final.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                return;
+            }
+
+            // Si el cuadro ID tiene número, estamos modificando; si está vacío, es uno nuevo
+            bool esEdicion = int.TryParse(txtIDCliente.Text, out int id);
+            if (!esEdicion) id = 0;
+
+            Conexion cn = new Conexion();
             try
             {
-                string id = txtIDCliente.Text.Trim();
-                string nombre = txtNombre.Text.Trim();
-                string dni = txtDNI.Text.Trim();
+                MySqlConnection con = cn.AbrirConexion();
 
-                if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(nombre) || string.IsNullOrEmpty(dni))
+                if (esEdicion && EsConsumidorFinal(con, id))
                 {
-                    MessageBox.Show("Todos los campos son obligatorios para el registro.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("No se puede modificar al Consumidor Final.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                     return;
                 }
 
-                if (id.ToUpper() == "C0")
+                // El DNI no puede estar repetido en otro cliente
+                MySqlCommand cmdDni = new MySqlCommand(
+                    "SELECT COUNT(*) FROM Clientes WHERE DNI = @Dni AND IdCliente <> @Id", con);
+                cmdDni.Parameters.AddWithValue("@Dni", dni);
+                cmdDni.Parameters.AddWithValue("@Id", id);
+                if ((int)cmdDni.ExecuteScalar() > 0)
                 {
-                    MessageBox.Show("El ID 'C0' está reservado para Consumidor Final.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                    MessageBox.Show("Ya existe otro cliente con ese DNI.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                var existente = SupermercadoEngine.Clientes.FirstOrDefault(c => c.Id == id);
+                string sql = esEdicion
+                    ? "UPDATE Clientes SET Nombre = @Nombre, DNI = @Dni, Estado = 1 WHERE IdCliente = @Id"
+                    : "INSERT INTO Clientes (Nombre, DNI, Estado) VALUES (@Nombre, @Dni, 1)";
 
-                if (existente != null)
-                {
-                    existente.Nombre = nombre;
-                    existente.Dni = dni;
-                    existente.Activo = true;
-                    MessageBox.Show("¡Datos del cliente actualizados!", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                else
-                {
-                    SupermercadoEngine.Clientes.Add(new Cliente
-                    {
-                        Id = id,
-                        Nombre = nombre,
-                        Dni = dni,
-                        Activo = true
-                    });
-                    MessageBox.Show("¡Nuevo cliente registrado con éxito!", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+                MySqlCommand cmd = new MySqlCommand(sql, con);
+                cmd.Parameters.AddWithValue("@Nombre", nombre);
+                cmd.Parameters.AddWithValue("@Dni", dni);
+                if (esEdicion) cmd.Parameters.AddWithValue("@Id", id);
+                cmd.ExecuteNonQuery();
 
-                RefrescarTabla();
+                MessageBox.Show(esEdicion ? "¡Datos del cliente actualizados!" : "¡Nuevo cliente registrado con éxito!",
+                    "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
                 LimpiarCampos();
+                RefrescarTabla();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error: {ex.Message}", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Error: " + ex.Message, "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                cn.CerrarConexion();
             }
         }
 
+        // ==========================================
+        // BAJA (LÓGICA SI TIENE VENTAS, FÍSICA SI NO)
+        // ==========================================
         private void btnBaja_Click(object sender, EventArgs e)
         {
+            if (!int.TryParse(txtIDCliente.Text, out int id))
+            {
+                MessageBox.Show("Tocá primero un cliente de la tabla.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            Conexion cn = new Conexion();
             try
             {
-                string id = txtIDCliente.Text.Trim();
+                MySqlConnection con = cn.AbrirConexion();
 
-                if (id.ToUpper() == "C0")
+                if (EsConsumidorFinal(con, id))
                 {
                     MessageBox.Show("No se puede dar de baja al Consumidor Final.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                     return;
                 }
 
-                var cliente = SupermercadoEngine.Clientes.FirstOrDefault(c => c.Id == id);
-
-                if (cliente == null)
-                {
-                    MessageBox.Show("Ingrese un ID de cliente válido.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                bool tieneVentas = SupermercadoEngine.HistorialVentas.Any(v => v.IdCliente == id);
+                MySqlCommand cmdVentas = new MySqlCommand(
+                    "SELECT COUNT(*) FROM Ventas WHERE IdCliente = @Id", con);
+                cmdVentas.Parameters.AddWithValue("@Id", id);
+                bool tieneVentas = (int)cmdVentas.ExecuteScalar() > 0;
 
                 if (tieneVentas)
                 {
-                    cliente.Activo = false;
+                    MySqlCommand cmdBaja = new MySqlCommand(
+                        "UPDATE Clientes SET Estado = 0 WHERE IdCliente = @Id", con);
+                    cmdBaja.Parameters.AddWithValue("@Id", id);
+                    cmdBaja.ExecuteNonQuery();
                     MessageBox.Show("El cliente registra compras. Se aplicó una BAJA LÓGICA.", "CajaPro - Integridad", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
                 else
                 {
-                    SupermercadoEngine.Clientes.Remove(cliente);
-                    MessageBox.Show("Cliente eliminado físicamente.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MySqlCommand cmdBorrar = new MySqlCommand(
+                        "DELETE FROM Clientes WHERE IdCliente = @Id", con);
+                    cmdBorrar.Parameters.AddWithValue("@Id", id);
+                    cmdBorrar.ExecuteNonQuery();
+                    MessageBox.Show("Cliente eliminado.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
 
-                RefrescarTabla();
                 LimpiarCampos();
+                RefrescarTabla();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error al procesar baja: {ex.Message}", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Error al procesar baja: " + ex.Message, "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                cn.CerrarConexion();
             }
         }
 
@@ -125,7 +195,7 @@ namespace CajaPro
             txtIDCliente.Clear();
             txtNombre.Clear();
             txtDNI.Clear();
-            txtIDCliente.Focus();
+            txtNombre.Focus();
         }
 
         private void dgvClientes_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -140,11 +210,13 @@ namespace CajaPro
         }
 
         // ========================================================
-        // PUENTES PARA EL DISEÑADOR (Evitan los errores CS1061)
+        // PUENTES PARA EL DISEÑADOR (los botones del formulario
+        // están conectados a estos nombres, así que se mantienen)
         // ========================================================
         private void btnGuardar_Click_1(object sender, EventArgs e)
         {
             btnGuardar_Click(sender, e);
+            MessageBox.Show("Entró a Guardar");
         }
 
         private void btnBaja_Click_1(object sender, EventArgs e)

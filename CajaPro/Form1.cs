@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CajaPro.Datos;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -7,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using CajaPro.Logica;
 
 
 
@@ -39,11 +41,9 @@ namespace CajaPro
             ventanaCli.MdiParent = this;
             ventanaCli.Show();
         }
+        
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
 
-        }
         private void AbrirFormInPanel(Form formHijo)
         {
             // 1. Limpiamos el panel si ya tiene otra pantalla abierta
@@ -105,6 +105,26 @@ namespace CajaPro
         private void label8_Click(object sender, EventArgs e)
         {
 
+        }
+
+        private void panel1_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            try
+            {
+                var con = new CajaPro.Datos.Conexion();
+                con.AbrirConexion();
+                MessageBox.Show("Conectado a TiDB");
+                con.CerrarConexion();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
     }
 }

@@ -57,7 +57,7 @@ namespace CajaPro.Logica
                 IdFactura = "FAC-" + (HistorialVentas.Count + 1).ToString("D6"),
                 IdCliente = idCliente,
                 Fecha = DateTime.Now,
-                Items = carrito,
+                Items = new List<DetalleVenta>(carrito),
                 Total = carrito.Sum(i => i.Subtotal)
             };
 

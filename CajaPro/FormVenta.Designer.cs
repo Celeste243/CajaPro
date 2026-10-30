@@ -64,12 +64,12 @@
             this.txtCodigoProducto = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.lblTotal = new System.Windows.Forms.Label();
             this.label10 = new System.Windows.Forms.Label();
             this.lblIVA = new System.Windows.Forms.Label();
             this.lblSubtotal = new System.Windows.Forms.Label();
             this.btnCancelar = new System.Windows.Forms.Button();
             this.btnQuitar = new System.Windows.Forms.Button();
-            this.lblTotal = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.dgvCarrito)).BeginInit();
             this.dtpFecha.SuspendLayout();
             this.groupBox1.SuspendLayout();
@@ -297,10 +297,8 @@
             // 
             // txtNroVenta
             // 
-            this.txtNroVenta.Enabled = false;
             this.txtNroVenta.Location = new System.Drawing.Point(98, 32);
             this.txtNroVenta.Name = "txtNroVenta";
-            this.txtNroVenta.ReadOnly = true;
             this.txtNroVenta.Size = new System.Drawing.Size(225, 30);
             this.txtNroVenta.TabIndex = 15;
             // 
@@ -364,7 +362,6 @@
             // 
             this.txtPrecio.Location = new System.Drawing.Point(259, 60);
             this.txtPrecio.Name = "txtPrecio";
-            this.txtPrecio.ReadOnly = true;
             this.txtPrecio.Size = new System.Drawing.Size(160, 30);
             this.txtPrecio.TabIndex = 6;
             // 
@@ -407,7 +404,6 @@
             // 
             this.txtCodigoProducto.Location = new System.Drawing.Point(17, 63);
             this.txtCodigoProducto.Name = "txtCodigoProducto";
-            this.txtCodigoProducto.ReadOnly = true;
             this.txtCodigoProducto.Size = new System.Drawing.Size(175, 30);
             this.txtCodigoProducto.TabIndex = 1;
             this.txtCodigoProducto.TextChanged += new System.EventHandler(this.txtCodigoProducto_TextChanged);
@@ -436,6 +432,15 @@
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Totales";
             this.groupBox2.Enter += new System.EventHandler(this.groupBox2_Enter);
+            // 
+            // lblTotal
+            // 
+            this.lblTotal.AutoSize = true;
+            this.lblTotal.Location = new System.Drawing.Point(127, 35);
+            this.lblTotal.Name = "lblTotal";
+            this.lblTotal.Size = new System.Drawing.Size(59, 23);
+            this.lblTotal.TabIndex = 3;
+            this.lblTotal.Text = "label4";
             // 
             // label10
             // 
@@ -492,15 +497,6 @@
             this.btnQuitar.TabIndex = 18;
             this.btnQuitar.Text = "Quitar";
             this.btnQuitar.UseVisualStyleBackColor = false;
-            // 
-            // lblTotal
-            // 
-            this.lblTotal.AutoSize = true;
-            this.lblTotal.Location = new System.Drawing.Point(127, 35);
-            this.lblTotal.Name = "lblTotal";
-            this.lblTotal.Size = new System.Drawing.Size(59, 23);
-            this.lblTotal.TabIndex = 3;
-            this.lblTotal.Text = "label4";
             // 
             // FormVenta
             // 

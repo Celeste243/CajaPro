@@ -36,7 +36,7 @@ namespace CajaPro
                 {
                     while (lector.Read())
                     {
-                        string estado = (bool)lector["Estado"] ? "Activo" : "Suspendido (Baja Lógica)";
+                        string estado = Convert.ToBoolean(lector["Estado"]) ? "Activo" : "Suspendido (Baja Lógica)";
                         dgvClientes.Rows.Add(
                             lector["IdCliente"],
                             lector["Nombre"].ToString().Trim(),
@@ -58,7 +58,7 @@ namespace CajaPro
                 "SELECT COUNT(*) FROM Clientes WHERE IdCliente = @Id AND DNI = @Dni", con);
             cmd.Parameters.AddWithValue("@Id", idCliente);
             cmd.Parameters.AddWithValue("@Dni", DniConsumidorFinal);
-            return (int)cmd.ExecuteScalar() > 0;
+            return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
         }
 
         // ==========================================
@@ -101,7 +101,7 @@ namespace CajaPro
                     "SELECT COUNT(*) FROM Clientes WHERE DNI = @Dni AND IdCliente <> @Id", con);
                 cmdDni.Parameters.AddWithValue("@Dni", dni);
                 cmdDni.Parameters.AddWithValue("@Id", id);
-                if ((int)cmdDni.ExecuteScalar() > 0)
+                if (Convert.ToInt32(cmdDni.ExecuteScalar()) > 0)
                 {
                     MessageBox.Show("Ya existe otro cliente con ese DNI.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -158,7 +158,7 @@ namespace CajaPro
                 MySqlCommand cmdVentas = new MySqlCommand(
                     "SELECT COUNT(*) FROM Ventas WHERE IdCliente = @Id", con);
                 cmdVentas.Parameters.AddWithValue("@Id", id);
-                bool tieneVentas = (int)cmdVentas.ExecuteScalar() > 0;
+                bool tieneVentas = Convert.ToInt32(cmdVentas.ExecuteScalar()) > 0;
 
                 if (tieneVentas)
                 {
@@ -216,7 +216,7 @@ namespace CajaPro
         private void btnGuardar_Click_1(object sender, EventArgs e)
         {
             btnGuardar_Click(sender, e);
-            MessageBox.Show("Entró a Guardar");
+            
         }
 
         private void btnBaja_Click_1(object sender, EventArgs e)

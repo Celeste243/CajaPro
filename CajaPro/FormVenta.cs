@@ -98,8 +98,8 @@ namespace CajaPro
                         {
                             encontrado = true;
                             nombre = lector["Nombre"].ToString();
-                            precio = (decimal)lector["Precio"];
-                            stock = (int)lector["Stock"];
+                            precio = Convert.ToDecimal(lector["Precio"]);
+                            stock = Convert.ToInt32(lector["Stock"]);
                         }
                     }
                 }
@@ -194,11 +194,12 @@ namespace CajaPro
                 // 2) Guardar la venta y obtener su número
                 MySqlCommand cmdVenta = new MySqlCommand(
                     "INSERT INTO Ventas (Fecha, IdCliente, Total) " +
-                    "OUTPUT INSERTED.IdVenta VALUES (GETDATE(), @IdCliente, @Total)",
+                    "VALUES (NOW(), @IdCliente, @Total)",
                     con, tran);
                 cmdVenta.Parameters.AddWithValue("@IdCliente", idCliente);
                 cmdVenta.Parameters.AddWithValue("@Total", total);
-                int idVenta = (int)cmdVenta.ExecuteScalar();
+                cmdVenta.ExecuteNonQuery();
+                int idVenta = (int)cmdVenta.LastInsertedId;
 
                 // 3) Guardar cada renglón del ticket
                 foreach (var item in carritoActual)

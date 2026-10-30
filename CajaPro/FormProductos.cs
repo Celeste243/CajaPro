@@ -42,11 +42,11 @@ namespace CajaPro
                 {
                     while (lector.Read())
                     {
-                        string estado = (bool)lector["Estado"] ? "Disponible" : "Baja Lógica";
+                        string estado = Convert.ToBoolean(lector["Estado"]) ? "Disponible" : "Baja Lógica";
                         dgvProductos.Rows.Add(
                             lector["Codigo"],
                             lector["Nombre"],
-                            ((decimal)lector["Precio"]).ToString("F2"),
+                            Convert.ToDecimal(lector["Precio"]).ToString("F2"),
                             lector["Stock"],
                             estado);
                     }
@@ -86,7 +86,7 @@ namespace CajaPro
                 MySqlCommand cmdExiste = new MySqlCommand(
                     "SELECT COUNT(*) FROM Productos WHERE Codigo = @Codigo", conexion);
                 cmdExiste.Parameters.AddWithValue("@Codigo", codigo);
-                bool existe = (int)cmdExiste.ExecuteScalar() > 0;
+                bool existe = Convert.ToInt32(cmdExiste.ExecuteScalar()) > 0;
 
                 string sql = existe
                     ? "UPDATE Productos SET Nombre=@Nombre, Categoria=@Categoria, Precio=@Precio, Stock=@Stock, Estado=1 WHERE Codigo=@Codigo"
@@ -138,13 +138,13 @@ namespace CajaPro
                     MessageBox.Show("No existe un producto con ese código.", "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                int idProducto = (int)resultado;
+                int idProducto = Convert.ToInt32(resultado);
 
                 // 2) ¿Ya se vendió alguna vez?
                 MySqlCommand cmdVentas = new MySqlCommand(
                     "SELECT COUNT(*) FROM DetalleVenta WHERE IdProductos = @Id", conexion);
                 cmdVentas.Parameters.AddWithValue("@Id", idProducto);
-                bool yaSeVendio = (int)cmdVentas.ExecuteScalar() > 0;
+                bool yaSeVendio = Convert.ToInt32(cmdVentas.ExecuteScalar()) > 0;
 
                 if (yaSeVendio)
                 {
@@ -257,7 +257,7 @@ namespace CajaPro
                     "WHERE p.Codigo = @Codigo", con);
                 cmdVentas.Parameters.AddWithValue("@Codigo", codigo);
 
-                if ((int)cmdVentas.ExecuteScalar() > 0)
+                if (Convert.ToInt32(cmdVentas.ExecuteScalar()) > 0)
                 {
                     MessageBox.Show("Este producto ya tiene ventas, no se puede eliminar. Usá \"Dar de baja\".",
                         "CajaPro - Integridad", MessageBoxButtons.OK, MessageBoxIcon.Warning);

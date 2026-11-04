@@ -126,5 +126,10 @@ namespace CajaPro
                 MessageBox.Show(ex.Message);
             }
         }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            new FormResumen().ShowDialog();
+        }
     }
 }

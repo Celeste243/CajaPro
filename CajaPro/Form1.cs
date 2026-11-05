@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using CajaPro.Logica;
+using MySql.Data.MySqlClient;
 
 
 
@@ -114,22 +115,66 @@ namespace CajaPro
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            CargarDashboard();
+        }
+        private void CargarDashboard()
+        {
+            DateTime desde = DateTime.Today.ToUniversalTime();
+            DateTime hasta = DateTime.Today.AddDays(1).ToUniversalTime();
+            const int umbralStockBajo = 5;
+
+            Conexion cn = new Conexion();
             try
             {
-                var con = new CajaPro.Datos.Conexion();
-                con.AbrirConexion();
-                MessageBox.Show("Conectado a TiDB");
-                con.CerrarConexion();
+                MySqlConnection con = cn.AbrirConexion();
+
+                label5.Text = Escalar(con,
+                    "SELECT COUNT(*) FROM Clientes WHERE Estado = 1 AND DNI <> '00000000'",
+                    desde, hasta).ToString();
+
+                label6.Text = Escalar(con,
+                    "SELECT COUNT(*) FROM Productos WHERE Estado = 1",
+                    desde, hasta).ToString();
+
+                label8.Text = Convert.ToDecimal(Escalar(con,
+                    "SELECT COALESCE(SUM(Total), 0) FROM Ventas WHERE Fecha >= @desde AND Fecha < @hasta",
+                    desde, hasta)).ToString("C2");
+
+                label10.Text = Escalar(con,
+                    "SELECT COUNT(*) FROM Productos WHERE Estado = 1 AND Stock <= " + umbralStockBajo,
+                    desde, hasta).ToString();
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message);
+                MessageBox.Show("No se pudo cargar el dashboard: " + ex.Message,
+                    "CajaPro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+            finally
+            {
+                cn.CerrarConexion();
+            }
+        }
+
+        private object Escalar(MySqlConnection con, string sql, DateTime desde, DateTime hasta)
+        {
+            MySqlCommand cmd = new MySqlCommand(sql, con);
+            cmd.Parameters.AddWithValue("@desde", desde);
+            cmd.Parameters.AddWithValue("@hasta", hasta);
+            return cmd.ExecuteScalar();
         }
 
         private void button5_Click(object sender, EventArgs e)
         {
             new FormResumen().ShowDialog();
+            CargarDashboard();
+        }
+
+        private void button6_Click(object sender, EventArgs e)
+        {
+            DialogResult r = MessageBox.Show("¿Seguro que querés salir de CajaPro?",
+       "CajaPro", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (r == DialogResult.Yes)
+                Application.Exit();
         }
     }
 }

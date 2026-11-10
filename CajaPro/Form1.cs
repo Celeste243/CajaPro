@@ -42,28 +42,29 @@ namespace CajaPro
             ventanaCli.MdiParent = this;
             ventanaCli.Show();
         }
-        
+
 
 
         private void AbrirFormInPanel(Form formHijo)
         {
-            // 1. Limpiamos el panel si ya tiene otra pantalla abierta
-            if (this.panelContenedor.Controls.Count > 0)
+            // Escondemos el dashboard (no lo borramos, para poder volver)
+            panel1.Visible = false;
+
+            // Quitamos la pantalla anterior, sin tocar el dashboard
+            if (this.panelContenedor.Tag is Form anterior)
             {
-                this.panelContenedor.Controls.RemoveAt(0);
+                this.panelContenedor.Controls.Remove(anterior);
+                anterior.Dispose();
             }
 
-            // 2. Configuramos el formulario hijo
             formHijo.TopLevel = false;
             formHijo.FormBorderStyle = FormBorderStyle.None;
-            formHijo.Dock = DockStyle.Fill; // Esto hace que se adapte al tamaño real del panel contenedor
+            formHijo.Dock = DockStyle.Fill;
 
-            // 3. Lo metemos adentro y lo mostramos
             this.panelContenedor.Controls.Add(formHijo);
             this.panelContenedor.Tag = formHijo;
             formHijo.Show();
         }
-
         private void button1_Click(object sender, EventArgs e)
         {
             AbrirFormInPanel(new FormVenta());
@@ -81,26 +82,15 @@ namespace CajaPro
 
         private void button4_Click(object sender, EventArgs e)
         {
-            // 1. Cambiamos el estado de la variable de incógnito
-            FormVenta.ModoIncognitoActivo = !FormVenta.ModoIncognitoActivo;
-
-            // 2. Cambiamos el texto y color del botón (cambiá "button4" por el nombre real de tu botón si da error)
-            if (FormVenta.ModoIncognitoActivo)
+            // Volver al dashboard: cerramos la pantalla abierta y mostramos el panel
+            if (this.panelContenedor.Tag is Form abierto)
             {
-                button4.Text = "Modo Visible";
-                button4.BackColor = Color.FromArgb(46, 117, 89);
+                this.panelContenedor.Controls.Remove(abierto);
+                abierto.Dispose();
+                this.panelContenedor.Tag = null;
             }
-            else
-            {
-                button4.Text = "Modo Incógnito";
-                button4.BackColor = Color.FromArgb(15, 20, 30);
-            }
-
-            // 3. Le avisamos a la pantalla de ventas que se actualice si está abierta
-            if (this.panelContenedor.Tag is FormVenta formVentaAbierto)
-            {
-                formVentaAbierto.Refresh();
-            }
+            panel1.Visible = true;
+            CargarDashboard();
         }
 
         private void label8_Click(object sender, EventArgs e)

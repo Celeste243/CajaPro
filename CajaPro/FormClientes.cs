@@ -19,9 +19,9 @@ namespace CajaPro
         private void FormClientes_Load(object sender, EventArgs e)
         {
             txtIDCliente.ReadOnly = true; // el ID lo numera la base
+            dgvClientes.CellClick += dgvClientes_CellClick;
             RefrescarTabla();
         }
-
         private void RefrescarTabla()
         {
             dgvClientes.Rows.Clear();
@@ -108,12 +108,13 @@ namespace CajaPro
                 }
 
                 string sql = esEdicion
-                    ? "UPDATE Clientes SET Nombre = @Nombre, DNI = @Dni, Estado = 1 WHERE IdCliente = @Id"
-                    : "INSERT INTO Clientes (Nombre, DNI, Estado) VALUES (@Nombre, @Dni, 1)";
+                    ? "UPDATE Clientes SET Nombre=@Nombre, DNI=@Dni, Telefono=@Tel, Email=@Email, Estado=1 WHERE IdCliente=@Id"
+                    : "INSERT INTO Clientes (Nombre, DNI, Telefono, Email, Estado) VALUES (@Nombre,@Dni,@Tel,@Email,1)";
 
                 MySqlCommand cmd = new MySqlCommand(sql, con);
                 cmd.Parameters.AddWithValue("@Nombre", nombre);
                 cmd.Parameters.AddWithValue("@Dni", dni);
+                
                 if (esEdicion) cmd.Parameters.AddWithValue("@Id", id);
                 cmd.ExecuteNonQuery();
 
@@ -227,6 +228,11 @@ namespace CajaPro
         private void dgvClientes_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
             dgvClientes_CellClick(sender, e);
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            LimpiarCampos();
         }
     }
 }

@@ -29,7 +29,7 @@ namespace CajaPro
             try
             {
                 MySqlCommand cmd = new MySqlCommand(
-                    "SELECT IdCliente, Nombre, DNI, Estado FROM Clientes ORDER BY Nombre",
+                    "SELECT IdCliente, Nombre, DNI, Estado, Telefono, Email FROM Clientes ORDER BY Nombre",
                     cn.AbrirConexion());
 
                 using (MySqlDataReader lector = cmd.ExecuteReader())
@@ -41,7 +41,9 @@ namespace CajaPro
                             lector["IdCliente"],
                             lector["Nombre"].ToString().Trim(),
                             lector["DNI"],
-                            estado);
+                            estado,
+                            lector["Telefono"],
+                            lector["Email"]);
                     }
                 }
             }
@@ -114,7 +116,10 @@ namespace CajaPro
                 MySqlCommand cmd = new MySqlCommand(sql, con);
                 cmd.Parameters.AddWithValue("@Nombre", nombre);
                 cmd.Parameters.AddWithValue("@Dni", dni);
-                
+                cmd.Parameters.AddWithValue("@Tel", textBox1.Text.Trim());
+                cmd.Parameters.AddWithValue("@Email", textBox2.Text.Trim());
+
+
                 if (esEdicion) cmd.Parameters.AddWithValue("@Id", id);
                 cmd.ExecuteNonQuery();
 
@@ -196,6 +201,8 @@ namespace CajaPro
             txtIDCliente.Clear();
             txtNombre.Clear();
             txtDNI.Clear();
+            textBox1.Clear();
+            textBox2.Clear();
             txtNombre.Focus();
         }
 
@@ -207,9 +214,10 @@ namespace CajaPro
                 txtIDCliente.Text = row.Cells[0].Value?.ToString();
                 txtNombre.Text = row.Cells[1].Value?.ToString();
                 txtDNI.Text = row.Cells[2].Value?.ToString();
+                textBox1.Text = row.Cells[4].Value?.ToString();
+                textBox2.Text = row.Cells[5].Value?.ToString();
             }
         }
-
         // ========================================================
         // PUENTES PARA EL DISEÑADOR (los botones del formulario
         // están conectados a estos nombres, así que se mantienen)

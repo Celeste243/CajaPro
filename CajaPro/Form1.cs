@@ -166,5 +166,12 @@ namespace CajaPro
             if (r == DialogResult.Yes)
                 Application.Exit();
         }
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+
+            lblFecha.Text = DateTime.Now.ToString("dd/MM/yyyy");
+            lblHora.Text = DateTime.Now.ToString("HH:mm");
+        }
     }
 }

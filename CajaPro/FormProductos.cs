@@ -20,6 +20,7 @@ namespace CajaPro
         public FormProductos()
         {
             InitializeComponent();
+            this.WindowState = FormWindowState.Maximized;
         }
 
         private void FormProductos_Load(object sender, EventArgs e)
@@ -330,6 +331,11 @@ namespace CajaPro
         private void button2_Click(object sender, EventArgs e)
         {
             EliminarProducto();
+        }
+
+        private void panel1_Paint(object sender, PaintEventArgs e)
+        {
+
         }
     }
 }
